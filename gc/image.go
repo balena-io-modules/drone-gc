@@ -96,10 +96,11 @@ func (c *collector) collectImages(ctx context.Context) error {
 				float64(image.Size),
 			)).
 			Int64("created", image.Created).
-			Strs("image", info.RepoTags).
+			Strs("repoTags", info.RepoTags).
+			Strs("repoDigests", info.RepoDigests).
 			Msg("remove image")
 
-		_, err = c.client.ImageRemove(ctx, image.ID, imageRemoveOpts)
+		err = c.removeImage(ctx, info)
 		if err != nil {
 			logger.Error().
 				Err(err).
@@ -115,7 +116,11 @@ func (c *collector) collectImages(ctx context.Context) error {
 			Strs("image", info.RepoTags).
 			Msg("image removed")
 
-		size = size - image.Size - image.SharedSize
+		size = size - image.Size
+		if shouldConsiderSharedSpace(c) {
+			size -= image.SharedSize
+		}
+
 		if size < c.threshold {
 			break
 		}
@@ -130,17 +135,35 @@ func (c *collector) collectImages(ctx context.Context) error {
 	return result
 }
 
+func shouldConsiderSharedSpace(c *collector) bool {
+	return c.imageRemoveOptions.PruneChildren
+}
+
+func (c *collector) removeImage(ctx context.Context, imageInspect types.ImageInspect) error {
+	var err error
+	var removalAttributes = []string{imageInspect.ID}
+	if len(imageInspect.RepoTags) > 0 {
+		removalAttributes = imageInspect.RepoTags
+	} else if len(imageInspect.RepoDigests) > 0 {
+		removalAttributes = imageInspect.RepoDigests
+	}
+
+	for _, attribute := range removalAttributes {
+		_, err = c.client.ImageRemove(ctx, attribute, c.imageRemoveOptions)
+		if err != nil {
+			break
+		}
+	}
+
+	return err
+}
+
 var imagePruneArgs = filters.NewArgs(
 	filters.KeyValuePair{
 		Key:   "until",
 		Value: "1h",
 	},
 )
-
-var imageRemoveOpts = types.ImageRemoveOptions{
-	PruneChildren: true,
-	Force:         true,
-}
 
 func isImageUsed(image *types.ImageSummary, containers []*types.Container) bool {
 	for _, container := range containers {

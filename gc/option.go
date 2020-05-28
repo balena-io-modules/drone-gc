@@ -4,10 +4,32 @@
 
 package gc
 
-import "time"
+import (
+	"docker.io/go-docker/api/types"
+	"time"
+)
 
 // Option configures a garbage collector option.
 type Option func(*collector)
+
+// WithDanglingImagesCollection returns an option to set the
+// behaviour the collector should follow when collecting dangling images
+// By default, the collector does not collect them
+func WithDanglingImagesCollection(enabled bool) Option {
+	return func(c *collector) {
+		c.shouldCollectDanglingImages = enabled
+	}
+}
+
+// WithImageRemoveOptions returns an option to set the
+// behaviour the collector should follow when collecting an image
+// The ImageRemoveOptions is the Docker native struct used in the imageRemove function
+// By default, all options are set to false
+func WithImageRemoveOptions(options types.ImageRemoveOptions) Option {
+	return func(c *collector) {
+		c.imageRemoveOptions = options
+	}
+}
 
 // WithImageWhitelist returns an option to set an image
 // whitelist. This will prevent the garbage collector from
