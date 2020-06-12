@@ -6,6 +6,7 @@ package gc
 
 import (
 	"context"
+	"docker.io/go-docker/api/types"
 	"time"
 
 	"docker.io/go-docker"
@@ -27,11 +28,13 @@ type Collector interface {
 type collector struct {
 	client docker.APIClient
 
-	whitelist 	[]string // reserved containers
-	reserved  	[]string // reserved images
-	threshold 	int64    // target threshold in bytes
-	minImageAge	time.Duration
-	filter    	FilterFunc
+	whitelist                   []string // reserved containers
+	reserved                    []string // reserved images
+	threshold                   int64    // target threshold in bytes
+	minImageAge                 time.Duration
+	filter                      FilterFunc
+	imageRemoveOptions          types.ImageRemoveOptions
+	shouldCollectDanglingImages bool
 }
 
 // New returns a garbage collector.
@@ -48,7 +51,9 @@ func (c *collector) Collect(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	c.collectContainers(ctx)
-	c.collectDanglingImages(ctx)
+	if c.shouldCollectDanglingImages {
+		c.collectDanglingImages(ctx)
+	}
 	c.collectImages(ctx)
 	c.collectNetworks(ctx)
 	c.collectVolumes(ctx)

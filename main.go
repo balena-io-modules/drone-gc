@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"docker.io/go-docker/api/types"
 	"os"
 	"time"
 
@@ -21,15 +22,18 @@ import (
 )
 
 type config struct {
-	Once       	bool          `envconfig:"GC_ONCE"`
-	Debug      	bool          `envconfig:"GC_DEBUG"`
-	Color      	bool          `envconfig:"GC_DEBUG_COLOR"`
-	Pretty     	bool          `envconfig:"GC_DEBUG_PRETTY"`
-	Images     	[]string      `envconfig:"GC_IGNORE_IMAGES"`
-	Containers 	[]string      `envconfig:"GC_IGNORE_CONTAINERS"`
-	Interval    time.Duration `envconfig:"GC_INTERVAL" default:"5m"`
-	MinImageAge time.Duration `envconfig:"GC_MIN_IMAGE_AGE" default:"1h"`
-	Cache      	string        `envconfig:"GC_CACHE" default:"5gb"`
+	Once                  bool          `envconfig:"GC_ONCE"`
+	Debug                 bool          `envconfig:"GC_DEBUG"`
+	Color                 bool          `envconfig:"GC_DEBUG_COLOR"`
+	Pretty                bool          `envconfig:"GC_DEBUG_PRETTY"`
+	Images                []string      `envconfig:"GC_IGNORE_IMAGES"`
+	Containers            []string      `envconfig:"GC_IGNORE_CONTAINERS"`
+	Interval              time.Duration `envconfig:"GC_INTERVAL" default:"5m"`
+	MinImageAge           time.Duration `envconfig:"GC_MIN_IMAGE_AGE" default:"1h"`
+	Cache                 string        `envconfig:"GC_CACHE" default:"5gb"`
+	CollectDanglingImages bool          `envconfig:"GC_COLLECT_DANGLING_IMAGES"`
+	PruneChildren         bool          `envconfig:"GC_PRUNE_CHILDREN"`
+	ForceRemoval          bool          `envconfig:"GC_FORCE_REMOVAL"`
 }
 
 func main() {
@@ -64,6 +68,11 @@ func main() {
 		gc.WithWhitelist(gc.ReservedNames),
 		gc.WithMinImageAge(cfg.MinImageAge),
 		gc.WithWhitelist(cfg.Containers),
+		gc.WithDanglingImagesCollection(cfg.CollectDanglingImages),
+		gc.WithImageRemoveOptions(types.ImageRemoveOptions{
+			PruneChildren: cfg.PruneChildren,
+			Force:         cfg.ForceRemoval,
+		}),
 	)
 	if cfg.Once {
 		collector.Collect(ctx)
